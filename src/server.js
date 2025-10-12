@@ -1,8 +1,7 @@
 
+import 'dotenv/config';
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { db } from './db.js';
 const app = express();
 const port = process.env.PORT || 3000;
 
@@ -23,7 +22,7 @@ app.use('/api/auth', authRoutes);
 // Endpoint untuk mengambil semua produk
 app.get('/api/products', async (req, res) => {
   try {
-    const products = await prisma.product.findMany({
+    const products = await db.product.findMany({
       include: {
         variants: true, // Sertakan varian produk
         category: true, // Sertakan kategori
