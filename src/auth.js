@@ -5,6 +5,34 @@ import jwt from 'jsonwebtoken';
 import { db } from './db.js';
 const router = express.Router();
 
+// Middleware untuk verifikasi JWT
+const authenticateToken = (req, res, next) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+  if (token == null) return res.sendStatus(401); // Jika tidak ada token
+
+  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+    if (err) return res.sendStatus(403); // Jika token tidak valid
+    req.userId = user.userId;
+    next();
+  });
+};
+
+// GET /api/auth/me - Mendapatkan data pengguna yang sedang login
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const user = await db.user.findUnique({ where: { id: req.userId } });
+    if (!user) {
+      return res.status(404).json({ message: "Pengguna tidak ditemukan" });
+    }
+    const { password, ...userWithoutPassword } = user;
+    res.json(userWithoutPassword);
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal mengambil data pengguna', error: error.message });
+  }
+});
+
 // POST /api/auth/register
 router.post('/register', async (req, res) => {
   const { name, email, password } = req.body;
