@@ -2,9 +2,7 @@
 import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { db } from './db.js';
 const router = express.Router();
 
 // POST /api/auth/register
@@ -16,14 +14,14 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    const existingUser = await prisma.user.findUnique({ where: { email } });
+    db.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: 'Email sudah terdaftar' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 12);
 
-    const user = await prisma.user.create({
+    const user = await db.user.create({
       data: {
         name,
         email,
@@ -49,7 +47,7 @@ router.post('/login', async (req, res) => {
   }
 
   try {
-    const user = await prisma.user.findUnique({ where: { email } });
+    const user = await db.user.findUnique({ where: { email } });
     if (!user) {
       return res.status(401).json({ message: 'Kredensial tidak valid' });
     }
