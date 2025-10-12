@@ -22,18 +22,49 @@ app.use('/api/auth', authRoutes);
 // Endpoint untuk mengambil semua produk
 app.get('/api/products', async (req, res) => {
   try {
-    const products = await db.product.findMany({
+    const productsFromDb = await db.product.findMany({
       include: {
-        variants: true, // Sertakan varian produk
-        category: true, // Sertakan kategori
+        variants: {
+          include: {
+            reviews: true,
+          },
+        },
+        category: true,
       },
     });
 
-    // Ubah struktur data agar sesuai dengan yang mungkin diharapkan frontend
-    // atau biarkan frontend yang menyesuaikan. Untuk saat ini, kita kirim data mentah.
-    res.json(products);
+    const formattedProducts = productsFromDb.map(p => {
+      const mainVariant = p.variants[0];
+      if (!mainVariant) return null;
+
+      const reviews = mainVariant.reviews || [];
+      const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+      const avgRating = reviews.length > 0 ? totalRating / reviews.length : 0;
+      const reviewCount = reviews.length;
+
+      let brand = 'Unknown';
+      try {
+        const attributes = JSON.parse(mainVariant.attributes);
+        brand = attributes.brand || 'Unknown';
+      } catch (e) {
+      }
+
+      return {
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        price: mainVariant.price,
+        image: mainVariant.image,
+        category: p.category.name,
+        brand: brand,
+        rating: avgRating,
+        reviewCount: reviewCount,
+      };
+    }).filter(p => p !== null);
+
+    res.json(formattedProducts);
   } catch (error) {
-    console.error(error);
+    console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Gagal mengambil data produk.' });
   }
 });
