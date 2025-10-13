@@ -1,5 +1,6 @@
 
 import { PrismaClient } from '@prisma/client';
+import bcrypt from 'bcryptjs';
 const prisma = new PrismaClient();
 
 // Data produk dari frontend untuk seeding
@@ -76,17 +77,78 @@ async function main() {
   console.log('Start seeding ...');
 
   // Hapus data lama
+  await prisma.review.deleteMany();
+  await prisma.cartItem.deleteMany();
+  await prisma.cart.deleteMany();
+  await prisma.address.deleteMany();
   await prisma.productVariant.deleteMany();
   await prisma.product.deleteMany();
   await prisma.category.deleteMany();
   await prisma.user.deleteMany();
 
   // Buat user default
+  const userPassword = await bcrypt.hash('password123', 12);
   const user = await prisma.user.create({
     data: {
       email: 'testuser@example.com',
       name: 'Test User',
-      password: 'password123', // In a real app, this should be hashed
+      password: userPassword,
+      role: 'USER',
+    },
+  });
+
+  // Buat admin default
+  const adminPassword = await bcrypt.hash('admin123', 12);
+  const admin = await prisma.user.create({
+    data: {
+      email: 'admin@example.com',
+      name: 'Admin User',
+      password: adminPassword,
+      role: 'ADMIN',
+    },
+  });
+
+  // Buat alamat untuk user
+  await prisma.address.create({
+    data: {
+      userId: user.id,
+      fullName: 'Test User',
+      phone: '081234567890',
+      address: 'Jl. Jenderal Sudirman No. 5',
+      city: 'Jakarta Selatan',
+      state: 'DKI Jakarta',
+      country: 'Indonesia',
+      pincode: '12190',
+      isDefault: true,
+    },
+  });
+
+  await prisma.address.create({
+    data: {
+      userId: user.id,
+      fullName: 'Test User (Kantor)',
+      phone: '081234567891',
+      address: 'Gedung Perkantoran ABC, Lantai 10',
+      city: 'Jakarta Pusat',
+      state: 'DKI Jakarta',
+      country: 'Indonesia',
+      pincode: '10210',
+      isDefault: false,
+    },
+  });
+
+  // Buat alamat untuk admin
+  await prisma.address.create({
+    data: {
+      userId: admin.id,
+      fullName: 'Admin User',
+      phone: '089876543210',
+      address: 'Jl. Admin No. 1',
+      city: 'Jakarta Barat',
+      state: 'DKI Jakarta',
+      country: 'Indonesia',
+      pincode: '11450',
+      isDefault: true,
     },
   });
 
@@ -103,14 +165,14 @@ async function main() {
     createdCategories[categoryName] = category;
   }
 
-  // Buat produk dan variannya
+  // Buat produk dan variannya (dibuat oleh admin)
   for (const productData of initialProducts) {
     const product = await prisma.product.create({
       data: {
         name: productData.name,
         description: productData.description,
         user: {
-          connect: { id: user.id },
+          connect: { id: admin.id },
         },
         category: {
           connect: { id: createdCategories[productData.category].id },
@@ -127,8 +189,7 @@ async function main() {
       },
     });
 
-    // Buat review dummy
-    // Di skema Anda, review terhubung ke ProductVariant, bukan Product
+    // Buat review dummy (dibuat oleh user biasa)
     const variant = await prisma.productVariant.findFirst({
         where: { productId: product.id }
     });
