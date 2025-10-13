@@ -10,14 +10,20 @@ app.use(express.json());
 // CORS Middleware - Izinkan akses dari frontend
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*'); // Ganti dengan domain frontend Anda di produksi
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  // Tangani preflight request
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(200);
+  }
   next();
 });
 
 import authRoutes from './auth.js';
+import cartRoutes from './cart.js';
 
 app.use('/api/auth', authRoutes);
+app.use('/api/cart', cartRoutes);
 
 // Endpoint untuk mengambil semua produk
 app.get('/api/products', async (req, res) => {

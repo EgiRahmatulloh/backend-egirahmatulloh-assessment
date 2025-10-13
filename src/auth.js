@@ -6,7 +6,7 @@ import { db } from './db.js';
 const router = express.Router();
 
 // Middleware untuk verifikasi JWT
-const authenticateToken = (req, res, next) => {
+export const authenticateToken = (req, res, next) => {
   const authHeader = req.headers['authorization'];
   const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
 
