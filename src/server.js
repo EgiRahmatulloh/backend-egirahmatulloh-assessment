@@ -23,11 +23,13 @@ import authRoutes from './auth.js';
 import cartRoutes from './cart.js';
 import userRoutes from './user.js';
 import addressRoutes from './address.js';
+import orderRoutes from './order.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/addresses', addressRoutes);
+app.use('/api/orders', orderRoutes);
 
 // Endpoint untuk mengambil semua produk
 app.get('/api/products', async (req, res) => {
