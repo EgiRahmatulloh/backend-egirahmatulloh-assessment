@@ -27,6 +27,34 @@ router.get('/', async (req, res) => {
   }
 });
 
+// GET /api/orders/:orderId - Get a single order by ID
+router.get('/:orderId', async (req, res) => {
+  const { orderId } = req.params;
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItems: { include: { variant: { include: { product: true } } } },
+        shippingInfo: true,
+        payment: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: "Pesanan tidak ditemukan" });
+    }
+
+    // Ensure the user is authorized to see this order
+    if (order.buyerId !== req.userId) {
+      return res.status(403).json({ message: "Tidak diizinkan" });
+    }
+
+    res.json(order);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil detail pesanan", error: error.message });
+  }
+});
+
 
 // POST /api/orders - Create a new order
 router.post('/', async (req, res) => {
