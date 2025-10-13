@@ -21,9 +21,11 @@ app.use((req, res, next) => {
 
 import authRoutes from './auth.js';
 import cartRoutes from './cart.js';
+import userRoutes from './user.js';
 
 app.use('/api/auth', authRoutes);
 app.use('/api/cart', cartRoutes);
+app.use('/api/users', userRoutes);
 
 // Endpoint untuk mengambil semua produk
 app.get('/api/products', async (req, res) => {
