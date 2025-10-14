@@ -20,6 +20,26 @@ export const getOrderHistory = async (req, res) => {
   }
 };
 
+// GET /api/orders/all - Get all orders (admin)
+export const getAllOrders = async (req, res) => {
+  try {
+    const orders = await db.order.findMany({
+      include: {
+        orderItems: true,
+        shippingInfo: true,
+        payment: true,
+        user: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+    res.json(orders);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal mengambil semua pesanan", error: error.message });
+  }
+};
+
 // GET /api/orders/:orderId - Get a single order by ID
 export const getOrderById = async (req, res) => {
   const { orderId } = req.params;
@@ -141,4 +161,23 @@ export const createOrder = async (req, res) => {
         console.error("Order creation failed:", error);
         res.status(500).json({ message: "Gagal membuat pesanan", error: error.message });
     }
+};
+
+// PUT /api/orders/:orderId/status - Update order status (admin)
+export const updateOrderStatus = async (req, res) => {
+  const { orderId } = req.params;
+  const { status } = req.body;
+
+  try {
+    const updatedOrder = await db.order.update({
+      where: { id: orderId },
+      data: { orderStatus: status },
+      include: {
+        user: true,
+      },
+    });
+    res.json(updatedOrder);
+  } catch (error) {
+    res.status(500).json({ message: "Gagal memperbarui status pesanan", error: error.message });
+  }
 };
