@@ -1,129 +1,12 @@
-import express from 'express';
-import multer from 'multer';
-import { db } from './db.js';
-import { authenticateToken, requireAdmin } from './auth.js';
-import cloudinary from './config/cloudinary.js';
+import { db } from '../config/db.js';
+import cloudinary from '../config/cloudinary.js';
+import {
+  formatProductForStorefront,
+  formatProductForAdmin,
+  getOrCreateCategory,
+} from '../utils/productUtils.js';
 
-const router = express.Router();
-
-const upload = multer({ storage: multer.memoryStorage() });
-
-const parseBrand = (attributes) => {
-  if (!attributes) {
-    return 'Unknown';
-  }
-
-  try {
-    const parsed = JSON.parse(attributes);
-    return parsed?.brand || 'Unknown';
-  } catch {
-    return 'Unknown';
-  }
-};
-
-const aggregateRating = (reviews = []) => {
-  if (!reviews.length) {
-    return { rating: 0, reviewCount: 0 };
-  }
-
-  const total = reviews.reduce((sum, review) => sum + review.rating, 0);
-  return {
-    rating: total / reviews.length,
-    reviewCount: reviews.length,
-  };
-};
-
-const formatProductForStorefront = (product) => {
-  const mainVariant = product.variants[0];
-  if (!mainVariant) {
-    return null;
-  }
-
-  const { rating, reviewCount } = aggregateRating(mainVariant.reviews);
-
-  return {
-    id: product.id,
-    name: product.name,
-    description: product.description,
-    price: mainVariant.price,
-    image: mainVariant.image || '',
-    category: product.category?.name ?? '',
-    brand: parseBrand(mainVariant.attributes),
-    rating,
-    reviewCount,
-  };
-};
-
-const formatProductForAdmin = (product) => {
-  const mainVariant = product.variants[0];
-  const { rating, reviewCount } = aggregateRating(mainVariant?.reviews);
-
-  return {
-    id: product.id,
-    name: product.name,
-    description: product.description,
-    categoryId: product.categoryId,
-    category: product.category?.name ?? '',
-    price: mainVariant?.price ?? 0,
-    stock: mainVariant?.stock ?? 0,
-    image: mainVariant?.image || '',
-    brand: parseBrand(mainVariant?.attributes),
-    rating,
-    reviewCount,
-    createdBy: product.createdBy,
-    createdAt: product.createdAt,
-    updatedAt: product.updatedAt,
-  };
-};
-
-const slugify = (value) => {
-  return value
-    .toString()
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '') || `category-${Date.now()}`;
-};
-
-const getOrCreateCategory = async (categoryName) => {
-  const trimmed = categoryName?.trim();
-  if (!trimmed) {
-    throw new Error('Nama kategori tidak boleh kosong');
-  }
-
-  const existing = await db.category.findFirst({
-    where: { name: trimmed },
-  });
-
-  if (existing) {
-    return existing;
-  }
-
-  const baseSlug = slugify(trimmed);
-  let slugCandidate = baseSlug;
-  let attempt = 1;
-
-  while (true) {
-    try {
-      return await db.category.create({
-        data: {
-          name: trimmed,
-          slug: slugCandidate,
-        },
-      });
-    } catch (error) {
-      if (error.code === 'P2002') {
-        slugCandidate = `${baseSlug}-${attempt++}`;
-      } else {
-        throw error;
-      }
-    }
-  }
-};
-
-router.get('/', async (req, res) => {
+export const getAllProducts = async (req, res) => {
   try {
     const productsFromDb = await db.product.findMany({
       where: { deletedAt: null },
@@ -146,9 +29,9 @@ router.get('/', async (req, res) => {
     console.error('Error fetching products:', error);
     res.status(500).json({ error: 'Gagal mengambil data produk.' });
   }
-});
+};
 
-router.get('/search', async (req, res) => {
+export const searchProducts = async (req, res) => {
   try {
     const { query } = req.query;
     if (!query) {
@@ -182,13 +65,9 @@ router.get('/search', async (req, res) => {
     console.error('Error searching products:', error);
     res.status(500).json({ error: 'Gagal mencari produk.' });
   }
-});
+};
 
-router.get(
-  '/admin',
-  authenticateToken,
-  requireAdmin,
-  async (req, res) => {
+export const getAdminProducts = async (req, res) => {
     try {
       const products = await db.product.findMany({
         where: { deletedAt: null },
@@ -208,15 +87,9 @@ router.get(
         .status(500)
         .json({ message: 'Gagal mengambil data produk admin', error: error.message });
     }
-  }
-);
+  };
 
-router.post(
-  '/',
-  authenticateToken,
-  requireAdmin,
-  upload.single('image'),
-  async (req, res) => {
+export const createProduct = async (req, res) => {
     const { name, description, categoryName, price, stock, brand } = req.body;
     let imageUrl = null;
 
@@ -275,15 +148,9 @@ router.post(
       console.error('Error creating product:', error);
       res.status(500).json({ message: 'Gagal membuat produk', error: error.message });
     }
-  }
-);
+  };
 
-router.put(
-  '/:id',
-  authenticateToken,
-  requireAdmin,
-  upload.single('image'),
-  async (req, res) => {
+export const updateProduct = async (req, res) => {
     const { id } = req.params;
     const { name, description, categoryName, price, stock, brand, image } = req.body;
     let imageUrl = image; // Keep existing image if no new one is uploaded
@@ -376,14 +243,9 @@ router.put(
       console.error('Error updating product:', error);
       res.status(500).json({ message: 'Gagal memperbarui produk', error: error.message });
     }
-  }
-);
+  };
 
-router.delete(
-  '/:id',
-  authenticateToken,
-  requireAdmin,
-  async (req, res) => {
+export const deleteProduct = async (req, res) => {
     const { id } = req.params;
 
     try {
@@ -406,7 +268,4 @@ router.delete(
       console.error('Error deleting product:', error);
       res.status(500).json({ message: 'Gagal menghapus produk', error: error.message });
     }
-  }
-);
-
-export default router;
+  };

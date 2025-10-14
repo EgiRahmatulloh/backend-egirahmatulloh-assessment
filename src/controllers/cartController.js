@@ -1,33 +1,7 @@
-import express from 'express';
-import { db } from './db.js';
-import { authenticateToken } from './auth.js'; // We will create this middleware
-
-const router = express.Router();
-
-// Middleware to get or create a cart for the user
-const getOrCreateCart = async (req, res, next) => {
-  try {
-    let cart = await db.cart.findUnique({
-      where: { userId: req.userId },
-    });
-
-    if (!cart) {
-      cart = await db.cart.create({
-        data: { userId: req.userId },
-      });
-    }
-    req.cart = cart;
-    next();
-  } catch (error) {
-    res.status(500).json({ message: "Gagal memproses keranjang", error: error.message });
-  }
-};
-
-// All cart routes will be protected and will have access to the user's cart
-router.use(authenticateToken, getOrCreateCart);
+import { db } from '../config/db.js';
 
 // GET /api/cart - Mendapatkan isi keranjang pengguna
-router.get('/', async (req, res) => {
+export const getCart = async (req, res) => {
   try {
     const cartItems = await db.cartItem.findMany({
       where: { cartId: req.cart.id },
@@ -57,10 +31,10 @@ router.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil isi keranjang", error: error.message });
   }
-});
+};
 
 // POST /api/cart/items - Menambahkan item ke keranjang
-router.post('/items', async (req, res) => {
+export const addCartItem = async (req, res) => {
   const { productId, quantity } = req.body;
   if (!productId || quantity == null) {
     return res.status(400).json({ message: "ProductId dan quantity diperlukan" });
@@ -121,10 +95,10 @@ router.post('/items', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal menambahkan item ke keranjang", error: error.message });
   }
-});
+};
 
 // PUT /api/cart/items/:itemId - Mengubah kuantitas item
-router.put('/items/:itemId', async (req, res) => {
+export const updateCartItem = async (req, res) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
@@ -161,10 +135,10 @@ router.put('/items/:itemId', async (req, res) => {
   } catch (error) {
      res.status(500).json({ message: "Gagal mengubah kuantitas item", error: error.message });
   }
-});
+};
 
 // DELETE /api/cart/items/:itemId - Menghapus item dari keranjang
-router.delete('/items/:itemId', async (req, res) => {
+export const deleteCartItem = async (req, res) => {
   const { itemId } = req.params;
 
   try {
@@ -195,6 +169,4 @@ router.delete('/items/:itemId', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal menghapus item dari keranjang", error: error.message });
   }
-});
-
-export default router;
+};

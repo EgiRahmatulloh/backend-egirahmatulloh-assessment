@@ -1,15 +1,8 @@
-import express from 'express';
 import bcrypt from 'bcryptjs';
-import { db } from './db.js';
-import { authenticateToken } from './auth.js';
-
-const router = express.Router();
-
-// All user routes will be protected
-router.use(authenticateToken);
+import { db } from '../config/db.js';
 
 // PUT /api/users/me - Update user profile
-router.put('/me', async (req, res) => {
+export const updateUserProfile = async (req, res) => {
   const { name, password } = req.body;
   const updateData = {};
 
@@ -39,6 +32,4 @@ router.put('/me', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal mengupdate profil", error: error.message });
   }
-});
-
-export default router;
+};

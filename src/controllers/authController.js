@@ -1,47 +1,9 @@
-
-import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import { db } from './db.js';
-const router = express.Router();
-
-// Middleware untuk verifikasi JWT
-export const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-  if (token == null) return res.sendStatus(401); // Jika tidak ada token
-
-  jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
-    if (err) return res.sendStatus(403); // Jika token tidak valid
-    req.userId = user.userId;
-    next();
-  });
-};
-
-export const requireAdmin = async (req, res, next) => {
-  try {
-    if (!req.userId) {
-      return res.status(401).json({ message: 'Token tidak valid' });
-    }
-
-    const user = await db.user.findUnique({
-      where: { id: req.userId },
-      select: { role: true },
-    });
-
-    if (!user || user.role !== 'ADMIN') {
-      return res.status(403).json({ message: 'Akses hanya diperbolehkan untuk admin' });
-    }
-
-    next();
-  } catch (error) {
-    res.status(500).json({ message: 'Gagal memverifikasi hak akses admin', error: error.message });
-  }
-};
+import { db } from '../config/db.js';
 
 // GET /api/auth/me - Mendapatkan data pengguna yang sedang login
-router.get('/me', authenticateToken, async (req, res) => {
+export const getMe = async (req, res) => {
   try {
     const user = await db.user.findUnique({ where: { id: req.userId } });
     if (!user) {
@@ -52,10 +14,10 @@ router.get('/me', authenticateToken, async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Gagal mengambil data pengguna', error: error.message });
   }
-});
+};
 
 // POST /api/auth/register
-router.post('/register', async (req, res) => {
+export const register = async (req, res) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
@@ -63,7 +25,7 @@ router.post('/register', async (req, res) => {
   }
 
   try {
-    db.user.findUnique({ where: { email } });
+    const existingUser = await db.user.findUnique({ where: { email } });
     if (existingUser) {
       return res.status(400).json({ message: 'Email sudah terdaftar' });
     }
@@ -75,6 +37,7 @@ router.post('/register', async (req, res) => {
         name,
         email,
         password: hashedPassword,
+        role: 'USER', // Default role for new users
       },
     });
 
@@ -85,10 +48,10 @@ router.post('/register', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Gagal membuat pengguna', error: error.message });
   }
-});
+};
 
 // POST /api/auth/login
-router.post('/login', async (req, res) => {
+export const login = async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -106,7 +69,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ message: 'Kredensial tidak valid' });
     }
 
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET, { expiresIn: '1h' });
+    const token = jwt.sign({ userId: user.id, role: user.role }, process.env.JWT_SECRET, { expiresIn: '1h' });
 
     const { password: _, ...userWithoutPassword } = user;
 
@@ -115,6 +78,4 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: 'Gagal login', error: error.message });
   }
-});
-
-export default router;
+};
