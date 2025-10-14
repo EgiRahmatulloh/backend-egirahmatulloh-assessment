@@ -19,6 +19,27 @@ export const authenticateToken = (req, res, next) => {
   });
 };
 
+export const requireAdmin = async (req, res, next) => {
+  try {
+    if (!req.userId) {
+      return res.status(401).json({ message: 'Token tidak valid' });
+    }
+
+    const user = await db.user.findUnique({
+      where: { id: req.userId },
+      select: { role: true },
+    });
+
+    if (!user || user.role !== 'ADMIN') {
+      return res.status(403).json({ message: 'Akses hanya diperbolehkan untuk admin' });
+    }
+
+    next();
+  } catch (error) {
+    res.status(500).json({ message: 'Gagal memverifikasi hak akses admin', error: error.message });
+  }
+};
+
 // GET /api/auth/me - Mendapatkan data pengguna yang sedang login
 router.get('/me', authenticateToken, async (req, res) => {
   try {
