@@ -1,5 +1,15 @@
 import { db } from '../config/db.js';
 
+const ORDER_STATUS_DESCRIPTIONS = {
+  PROCESSING: 'Pesanan diterima dan sedang diproses oleh penjual.',
+  SHIPPED: 'Pesanan telah dikirim dan menunggu penjemputan kurir.',
+  IN_TRANSIT: 'Pesanan sedang dalam perjalanan menuju alamat tujuan.',
+  DELIVERED: 'Pesanan telah diterima oleh pembeli.',
+  CANCELLED: 'Pesanan dibatalkan oleh penjual atau pembeli.',
+};
+
+const TRACKABLE_STATUSES = Object.keys(ORDER_STATUS_DESCRIPTIONS);
+
 // GET /api/orders - Get user's order history
 export const getOrderHistory = async (req, res) => {
   try {
@@ -9,6 +19,11 @@ export const getOrderHistory = async (req, res) => {
         orderItems: true,
         shippingInfo: true,
         payment: true,
+        trackingUpdates: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -29,6 +44,11 @@ export const getAllOrders = async (req, res) => {
         shippingInfo: true,
         payment: true,
         user: true,
+        trackingUpdates: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
       orderBy: {
         createdAt: 'desc',
@@ -50,6 +70,11 @@ export const getOrderById = async (req, res) => {
         orderItems: { include: { variant: { include: { product: true } } } },
         shippingInfo: true,
         payment: true,
+        trackingUpdates: {
+          orderBy: {
+            createdAt: 'asc',
+          },
+        },
       },
     });
 
@@ -138,12 +163,19 @@ export const createOrder = async (req, res) => {
                             paymentStatus: 'PENDING',
                             paymentType: 'Belum Dipilih',
                         }
+                    },
+                    trackingUpdates: {
+                      create: {
+                        status: 'PROCESSING',
+                        description: ORDER_STATUS_DESCRIPTIONS.PROCESSING,
+                      },
                     }
                 },
                 include: {
                     orderItems: true,
                     shippingInfo: true,
                     payment: true,
+                    trackingUpdates: true,
                 }
             });
 
@@ -166,18 +198,62 @@ export const createOrder = async (req, res) => {
 // PUT /api/orders/:orderId/status - Update order status (admin)
 export const updateOrderStatus = async (req, res) => {
   const { orderId } = req.params;
-  const { status } = req.body;
+  const { status, description, trackingNumber } = req.body;
+
+  if (!status || !TRACKABLE_STATUSES.includes(status)) {
+    return res.status(400).json({ message: "Status pesanan tidak valid" });
+  }
 
   try {
-    const updatedOrder = await db.order.update({
-      where: { id: orderId },
-      data: { orderStatus: status },
-      include: {
-        user: true,
-      },
+    const updatedOrder = await db.$transaction(async (prisma) => {
+      const existingOrder = await prisma.order.findUnique({
+        where: { id: orderId },
+      });
+
+      if (!existingOrder) {
+        throw new Error('Pesanan tidak ditemukan');
+      }
+
+      const updated = await prisma.order.update({
+        where: { id: orderId },
+        data: {
+          orderStatus: status,
+          trackingNumber: typeof trackingNumber === 'string' && trackingNumber.trim().length > 0
+            ? trackingNumber.trim()
+            : existingOrder.trackingNumber,
+        },
+      });
+
+      await prisma.orderTrackingUpdate.create({
+        data: {
+          orderId,
+          status,
+          description: (typeof description === 'string' && description.trim().length > 0)
+            ? description.trim()
+            : ORDER_STATUS_DESCRIPTIONS[status],
+        },
+      });
+
+      return prisma.order.findUnique({
+        where: { id: updated.id },
+        include: {
+          user: true,
+          orderItems: true,
+          shippingInfo: true,
+          payment: true,
+          trackingUpdates: {
+            orderBy: {
+              createdAt: 'asc',
+            },
+          },
+        },
+      });
     });
     res.json(updatedOrder);
   } catch (error) {
+    if (error.message === 'Pesanan tidak ditemukan') {
+      return res.status(404).json({ message: error.message });
+    }
     res.status(500).json({ message: "Gagal memperbarui status pesanan", error: error.message });
   }
 };

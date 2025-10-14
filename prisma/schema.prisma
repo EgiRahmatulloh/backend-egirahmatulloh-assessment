@@ -16,6 +16,7 @@ enum Role {
 enum OrderStatus {
   PROCESSING
   SHIPPED
+  IN_TRANSIT
   DELIVERED
   CANCELLED
 }
@@ -149,12 +150,25 @@ model Order {
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
 
-  user         User          @relation(fields: [buyerId], references: [id], onDelete: Cascade)
-  orderItems   OrderItem[]
-  payment      Payment?
-  shippingInfo ShippingInfo?
+  user            User                  @relation(fields: [buyerId], references: [id], onDelete: Cascade)
+  orderItems      OrderItem[]
+  payment         Payment?
+  shippingInfo    ShippingInfo?
+  trackingUpdates OrderTrackingUpdate[]
 
   @@map("orders")
+}
+
+model OrderTrackingUpdate {
+  id          String      @id @default(uuid())
+  orderId     String
+  status      OrderStatus
+  description String?
+  createdAt   DateTime    @default(now())
+
+  order Order @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@map("order_tracking_updates")
 }
 
 model OrderItem {
