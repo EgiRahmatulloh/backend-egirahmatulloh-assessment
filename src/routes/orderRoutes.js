@@ -6,6 +6,7 @@ import {
   createOrder,
   getAllOrders,
   updateOrderStatus,
+  requestPaymentIntent,
 } from '../controllers/orderController.js';
 
 const router = express.Router();
@@ -17,6 +18,7 @@ router.use(authenticateToken);
 router.get('/all', requireAdmin, getAllOrders);
 
 router.get('/', getOrderHistory);
+router.post('/:orderId/payment-intent', requestPaymentIntent);
 router.get('/:orderId', getOrderById);
 router.post('/', createOrder);
 
