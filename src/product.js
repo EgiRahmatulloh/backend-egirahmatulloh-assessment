@@ -144,6 +144,42 @@ router.get('/', async (req, res) => {
   }
 });
 
+router.get('/search', async (req, res) => {
+  try {
+    const { query } = req.query;
+    if (!query) {
+      return res.status(400).json({ error: 'Parameter query tidak boleh kosong.' });
+    }
+
+    const productsFromDb = await db.product.findMany({
+      where: {
+        deletedAt: null,
+        name: {
+          contains: query,
+          mode: 'insensitive',
+        },
+      },
+      include: {
+        variants: {
+          include: { reviews: true },
+          orderBy: { createdAt: 'asc' },
+        },
+        category: true,
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    const formatted = productsFromDb
+      .map(formatProductForStorefront)
+      .filter(Boolean);
+
+    res.json(formatted);
+  } catch (error) {
+    console.error('Error searching products:', error);
+    res.status(500).json({ error: 'Gagal mencari produk.' });
+  }
+});
+
 router.get(
   '/admin',
   authenticateToken,
