@@ -1,4 +1,6 @@
+import { PaymentStatus } from '@prisma/client';
 import { db } from '../config/db.js';
+import { createPaymentIntentForOrder } from '../services/paymentService.js';
 
 const ORDER_STATUS_DESCRIPTIONS = {
   PROCESSING: 'Pesanan diterima dan sedang diproses oleh penjual.',
@@ -135,7 +137,6 @@ export const createOrder = async (req, res) => {
                     taxPrice,
                     shippingPrice,
                     orderStatus: 'PROCESSING',
-                    // Create ShippingInfo from the selected Address
                     shippingInfo: {
                         create: {
                             fullName: address.fullName,
@@ -147,7 +148,6 @@ export const createOrder = async (req, res) => {
                             pincode: address.pincode,
                         },
                     },
-                    // Create OrderItems from CartItems
                     orderItems: {
                         create: cart.items.map(item => ({
                             variantId: item.variantId,
@@ -157,11 +157,10 @@ export const createOrder = async (req, res) => {
                             title: 'Product Title Placeholder', // Placeholder
                         })),
                     },
-                    // Create initial Payment record
                     payment: {
                         create: {
-                            paymentStatus: 'PENDING',
-                            paymentType: 'Belum Dipilih',
+                            paymentStatus: PaymentStatus.PENDING,
+                            paymentType: 'ONLINE',
                         }
                     },
                     trackingUpdates: {
@@ -179,20 +178,99 @@ export const createOrder = async (req, res) => {
                 }
             });
 
-            // 4. Clear the user's cart
-            await prisma.cartItem.deleteMany({
-                where: { cartId: cart.id },
-            });
-
             return order;
         });
 
-        res.status(201).json(newOrder);
+        let paymentIntent;
+        try {
+            paymentIntent = await createPaymentIntentForOrder(newOrder.id, totalPrice);
+        } catch (paymentError) {
+            console.error("Payment intent creation failed:", paymentError);
+            await db.payment.update({
+                where: { orderId: newOrder.id },
+                data: {
+                    paymentStatus: PaymentStatus.FAILED,
+                    paymentType: 'ONLINE',
+                },
+            });
+            return res.status(500).json({
+                message: "Gagal memproses pembayaran",
+                error: paymentError.message,
+            });
+        }
+
+        const orderWithPayment = await db.order.findUnique({
+            where: { id: newOrder.id },
+            include: {
+                orderItems: true,
+                shippingInfo: true,
+                payment: true,
+                trackingUpdates: true,
+            },
+        });
+
+        await db.cartItem.deleteMany({
+            where: { cartId: cart.id },
+        });
+
+        res.status(201).json({
+            order: orderWithPayment,
+            paymentIntentClientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id,
+            stripePublishableKey: process.env.STRIPE_API_KEY || null,
+        });
 
     } catch (error) {
         console.error("Order creation failed:", error);
         res.status(500).json({ message: "Gagal membuat pesanan", error: error.message });
     }
+};
+
+export const requestPaymentIntent = async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const order = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        payment: true,
+      },
+    });
+
+    if (!order) {
+      return res.status(404).json({ message: 'Pesanan tidak ditemukan' });
+    }
+
+    if (order.buyerId !== req.userId) {
+      return res.status(403).json({ message: 'Tidak diizinkan' });
+    }
+
+    if (order.payment?.paymentStatus === PaymentStatus.PAID) {
+      return res.status(400).json({ message: 'Pesanan sudah dibayar' });
+    }
+
+    const paymentIntent = await createPaymentIntentForOrder(orderId, order.totalPrice);
+
+    const refreshedOrder = await db.order.findUnique({
+      where: { id: orderId },
+      include: {
+        orderItems: true,
+        shippingInfo: true,
+        payment: true,
+        trackingUpdates: true,
+      },
+    });
+
+    res.json({
+      order: refreshedOrder,
+      paymentIntentClientSecret: paymentIntent.client_secret,
+      paymentIntentId: paymentIntent.id,
+      stripePublishableKey: process.env.STRIPE_API_KEY || null,
+    });
+  } catch (error) {
+    console.error('Failed to generate payment intent:', error);
+    res.status(500).json({ message: 'Gagal memproses pembayaran', error: error.message });
+  }
 };
 
 // PUT /api/orders/:orderId/status - Update order status (admin)
