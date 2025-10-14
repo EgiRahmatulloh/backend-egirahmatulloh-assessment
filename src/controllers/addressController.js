@@ -1,14 +1,7 @@
-import express from 'express';
-import { db } from './db.js';
-import { authenticateToken } from './auth.js';
-
-const router = express.Router();
-
-// All address routes are protected
-router.use(authenticateToken);
+import { db } from '../config/db.js';
 
 // GET /api/addresses - Get all addresses for a user
-router.get('/', async (req, res) => {
+export const getAllAddresses = async (req, res) => {
   try {
     const addresses = await db.address.findMany({
       where: { userId: req.userId },
@@ -18,10 +11,10 @@ router.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil alamat", error: error.message });
   }
-});
+};
 
 // POST /api/addresses - Create a new address
-router.post('/', async (req, res) => {
+export const createAddress = async (req, res) => {
   const { fullName, phone, address, city, state, country, pincode, isDefault } = req.body;
 
   // Basic validation
@@ -48,10 +41,10 @@ router.post('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal membuat alamat baru", error: error.message });
   }
-});
+};
 
 // PUT /api/addresses/:addressId - Update an address
-router.put('/:addressId', async (req, res) => {
+export const updateAddress = async (req, res) => {
   const { addressId } = req.params;
   const { isDefault } = req.body;
 
@@ -72,10 +65,10 @@ router.put('/:addressId', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal mengupdate alamat", error: error.message });
   }
-});
+};
 
 // DELETE /api/addresses/:addressId - Delete an address
-router.delete('/:addressId', async (req, res) => {
+export const deleteAddress = async (req, res) => {
   const { addressId } = req.params;
 
   try {
@@ -86,6 +79,4 @@ router.delete('/:addressId', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal menghapus alamat", error: error.message });
   }
-});
-
-export default router;
+};

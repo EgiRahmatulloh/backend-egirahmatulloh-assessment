@@ -1,14 +1,7 @@
-import express from 'express';
-import { db } from './db.js';
-import { authenticateToken } from './auth.js';
-
-const router = express.Router();
-
-// All order routes are protected
-router.use(authenticateToken);
+import { db } from '../config/db.js';
 
 // GET /api/orders - Get user's order history
-router.get('/', async (req, res) => {
+export const getOrderHistory = async (req, res) => {
   try {
     const orders = await db.order.findMany({
       where: { buyerId: req.userId },
@@ -25,10 +18,10 @@ router.get('/', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil riwayat pesanan", error: error.message });
   }
-});
+};
 
 // GET /api/orders/:orderId - Get a single order by ID
-router.get('/:orderId', async (req, res) => {
+export const getOrderById = async (req, res) => {
   const { orderId } = req.params;
   try {
     const order = await db.order.findUnique({
@@ -53,11 +46,11 @@ router.get('/:orderId', async (req, res) => {
   } catch (error) {
     res.status(500).json({ message: "Gagal mengambil detail pesanan", error: error.message });
   }
-});
+};
 
 
 // POST /api/orders - Create a new order
-router.post('/', async (req, res) => {
+export const createOrder = async (req, res) => {
     const { selectedAddressId, selectedDeliveryId } = req.body;
 
     if (!selectedAddressId || !selectedDeliveryId) {
@@ -148,6 +141,4 @@ router.post('/', async (req, res) => {
         console.error("Order creation failed:", error);
         res.status(500).json({ message: "Gagal membuat pesanan", error: error.message });
     }
-});
-
-export default router;
+};
