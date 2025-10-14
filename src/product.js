@@ -1,8 +1,12 @@
 import express from 'express';
+import multer from 'multer';
 import { db } from './db.js';
 import { authenticateToken, requireAdmin } from './auth.js';
+import cloudinary from './config/cloudinary.js';
 
 const router = express.Router();
+
+const upload = multer({ storage: multer.memoryStorage() });
 
 const parseBrand = (attributes) => {
   if (!attributes) {
@@ -211,8 +215,10 @@ router.post(
   '/',
   authenticateToken,
   requireAdmin,
+  upload.single('image'),
   async (req, res) => {
-    const { name, description, categoryName, price, stock, brand, image } = req.body;
+    const { name, description, categoryName, price, stock, brand } = req.body;
+    let imageUrl = null;
 
     if (!name || !description || !categoryName || price == null || stock == null || !brand) {
       return res.status(400).json({
@@ -229,6 +235,15 @@ router.post(
     }
 
     try {
+      if (req.file) {
+        const b64 = Buffer.from(req.file.buffer).toString("base64");
+        let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+        const cloudinaryResponse = await cloudinary.uploader.upload(dataURI, {
+          folder: 'shopku_products',
+        });
+        imageUrl = cloudinaryResponse.secure_url;
+      }
+
       const category = await getOrCreateCategory(categoryName);
       const product = await db.product.create({
         data: {
@@ -242,7 +257,7 @@ router.post(
               price: numericPrice,
               stock: numericStock,
               attributes: JSON.stringify({ brand: brand.trim() }),
-              image: image?.trim() || null,
+              image: imageUrl,
             },
           },
         },
@@ -267,9 +282,11 @@ router.put(
   '/:id',
   authenticateToken,
   requireAdmin,
+  upload.single('image'),
   async (req, res) => {
     const { id } = req.params;
     const { name, description, categoryName, price, stock, brand, image } = req.body;
+    let imageUrl = image; // Keep existing image if no new one is uploaded
 
     if (!name || !description || !categoryName || price == null || stock == null || !brand) {
       return res.status(400).json({
@@ -286,6 +303,17 @@ router.put(
     }
 
     try {
+      if (req.file) {
+        const b64 = Buffer.from(req.file.buffer).toString("base64");
+        let dataURI = "data:" + req.file.mimetype + ";base64," + b64;
+        const cloudinaryResponse = await cloudinary.uploader.upload(dataURI, {
+          folder: 'shopku_products',
+        });
+        imageUrl = cloudinaryResponse.secure_url;
+      } else if (image === '' || image === 'null') {
+        imageUrl = null; // Explicitly clear image if requested
+      }
+
       const existingProduct = await db.product.findUnique({
         where: { id },
         include: { variants: true },
@@ -312,7 +340,7 @@ router.put(
           price: numericPrice,
           stock: numericStock,
           attributes: JSON.stringify({ brand: brand.trim() }),
-          image: image?.trim() || null,
+          image: imageUrl,
         };
 
         if (primaryVariant) {
@@ -320,7 +348,8 @@ router.put(
             where: { id: primaryVariant.id },
             data: variantPayload,
           });
-        } else {
+        }
+        else {
           await tx.productVariant.create({
             data: {
               productId: id,
