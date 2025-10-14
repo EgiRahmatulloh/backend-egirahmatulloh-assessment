@@ -43,6 +43,7 @@ export const formatProductForStorefront = (product) => {
     brand: parseBrand(mainVariant.attributes),
     rating,
     reviewCount,
+    stock: mainVariant.stock,
   };
 };
 
