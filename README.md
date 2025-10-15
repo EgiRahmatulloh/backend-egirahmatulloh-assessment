@@ -90,6 +90,14 @@ Setelah menjalankan `npm run prisma:seed`, akun berikut akan dibuat:
 
 ## API Endpoints
 
+### Admin (`/api/admin`)
+
+| Method | Endpoint                    | Access  | Deskripsi                               |
+| :----- | :-------------------------- | :------ | :---------------------------------------- |
+| `GET`    | `/stats`                    | Private, Admin | Dapatkan statistik dashboard             |
+| `GET`    | `/stats/overview`           | Private, Admin | Dapatkan data ringkasan penjualan        |
+| `GET`    | `/stats/recent-sales`       | Private, Admin | Dapatkan data penjualan terbaru          |
+
 ### Autentikasi (`/api/auth`)
 
 | Method | Endpoint                    | Access  | Deskripsi                               |
