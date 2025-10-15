@@ -76,7 +76,27 @@ Untuk production:
 npm start
 ```
 
+## Akun Default (Setelah Seeding)
+
+Setelah menjalankan `npm run prisma:seed`, akun berikut akan dibuat:
+
+*   **User Biasa:**
+    *   **Email:** `user@example.com`
+    *   **Password:** `password123`
+
+*   **Admin:**
+    *   **Email:** `admin@example.com`
+    *   **Password:** `admin123`
+
 ## API Endpoints
+
+### Admin (`/api/admin`)
+
+| Method | Endpoint                    | Access  | Deskripsi                               |
+| :----- | :-------------------------- | :------ | :---------------------------------------- |
+| `GET`    | `/stats`                    | Private, Admin | Dapatkan statistik dashboard             |
+| `GET`    | `/stats/overview`           | Private, Admin | Dapatkan data ringkasan penjualan        |
+| `GET`    | `/stats/recent-sales`       | Private, Admin | Dapatkan data penjualan terbaru          |
 
 ### Autentikasi (`/api/auth`)
 
