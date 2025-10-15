@@ -1,7 +1,7 @@
 import { PaymentStatus } from '@prisma/client';
 import { db } from '../config/db.js';
 import { getStripeClient } from '../utils/stripe.js';
-import { emitInventoryUpdate } from '../realtime/inventoryGateway.js';
+import { emitInventoryUpdate, emitOrderEvent } from '../realtime/inventoryGateway.js';
 import { buildInventoryUpdateFromVariant } from '../utils/productUtils.js';
 
 const DEFAULT_CURRENCY = (process.env.STRIPE_CURRENCY || 'idr').toLowerCase();
@@ -76,16 +76,14 @@ export const markPaymentSucceeded = async (paymentIntentId) => {
     throw new Error('Payment intent ID is required.');
   }
 
-  await db.$transaction(async (prisma) => {
+  const result = await db.$transaction(async (prisma) => {
     const paymentRecord = await prisma.payment.findUnique({
       where: { paymentIntentId },
       include: {
         order: {
           include: {
             orderItems: {
-              include: {
-                variant: true,
-              },
+              include: { variant: true },
             },
           },
         },
@@ -93,11 +91,11 @@ export const markPaymentSucceeded = async (paymentIntentId) => {
     });
 
     if (!paymentRecord || !paymentRecord.order) {
-      return;
+      return null;
     }
 
     if (paymentRecord.paymentStatus === PaymentStatus.PAID) {
-      return;
+      return null;
     }
 
     await prisma.payment.update({
@@ -114,6 +112,8 @@ export const markPaymentSucceeded = async (paymentIntentId) => {
         paidAt: new Date(),
       },
     });
+
+    const inventoryUpdates = [];
 
     for (const item of paymentRecord.order.orderItems) {
       if (!item.variant) {
@@ -134,11 +134,44 @@ export const markPaymentSucceeded = async (paymentIntentId) => {
           updatedAt: new Date(),
         },
       );
+
       if (inventoryUpdate) {
-        emitInventoryUpdate(inventoryUpdate);
+        inventoryUpdates.push(inventoryUpdate);
       }
     }
+
+    const orderPayload = await prisma.order.findUnique({
+      where: { id: paymentRecord.orderId },
+      include: {
+        user: true,
+        orderItems: true,
+        shippingInfo: true,
+        payment: true,
+        trackingUpdates: {
+          orderBy: { createdAt: 'asc' },
+        },
+      },
+    });
+
+    return {
+      inventoryUpdates,
+      order: orderPayload,
+    };
   });
+
+  if (!result) {
+    return;
+  }
+
+  if (Array.isArray(result.inventoryUpdates)) {
+    result.inventoryUpdates.forEach(update => {
+      emitInventoryUpdate(update);
+    });
+  }
+
+  if (result.order) {
+    emitOrderEvent({ type: 'ORDER_PAYMENT_UPDATED', order: result.order });
+  }
 };
 
 export const markPaymentFailed = async (paymentIntentId, failureReason) => {

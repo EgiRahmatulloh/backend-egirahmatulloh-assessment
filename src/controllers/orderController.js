@@ -1,6 +1,7 @@
 import { PaymentStatus } from '@prisma/client';
 import { db } from '../config/db.js';
 import { createPaymentIntentForOrder } from '../services/paymentService.js';
+import { emitOrderEvent } from '../realtime/inventoryGateway.js';
 
 const ORDER_STATUS_DESCRIPTIONS = {
   PROCESSING: 'Pesanan diterima dan sedang diproses oleh penjual.',
@@ -206,6 +207,7 @@ export const createOrder = async (req, res) => {
                 shippingInfo: true,
                 payment: true,
                 trackingUpdates: true,
+                user: true,
             },
         });
 
@@ -219,6 +221,10 @@ export const createOrder = async (req, res) => {
             paymentIntentId: paymentIntent.id,
             stripePublishableKey: process.env.STRIPE_API_KEY || null,
         });
+
+        if (orderWithPayment) {
+            emitOrderEvent({ type: 'ORDER_CREATED', order: orderWithPayment });
+        }
 
     } catch (error) {
         console.error("Order creation failed:", error);
@@ -328,6 +334,9 @@ export const updateOrderStatus = async (req, res) => {
       });
     });
     res.json(updatedOrder);
+    if (updatedOrder) {
+      emitOrderEvent({ type: 'ORDER_STATUS_UPDATED', order: updatedOrder });
+    }
   } catch (error) {
     if (error.message === 'Pesanan tidak ditemukan') {
       return res.status(404).json({ message: error.message });
