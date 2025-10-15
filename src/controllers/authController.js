@@ -3,8 +3,12 @@ import jwt from 'jsonwebtoken';
 import crypto from 'crypto';
 import { db } from '../config/db.js';
 
-// GET /api/auth/me - Mendapatkan data pengguna yang sedang login
-export const getMe = async (req, res) => {
+/**
+ * @route GET /api/auth/me
+ * @desc Get the currently logged-in user
+ * @access Private
+ */
+export const getMe = async (req, res, next) => {
   try {
     const user = await db.user.findUnique({ where: { id: req.userId } });
     if (!user) {
@@ -13,12 +17,16 @@ export const getMe = async (req, res) => {
     const { password, ...userWithoutPassword } = user;
     res.json(userWithoutPassword);
   } catch (error) {
-    res.status(500).json({ message: 'Gagal mengambil data pengguna', error: error.message });
+    next(error);
   }
 };
 
-// POST /api/auth/register
-export const register = async (req, res) => {
+/**
+ * @route POST /api/auth/register
+ * @desc Register a new user
+ * @access Public
+ */
+export const register = async (req, res, next) => {
   const { name, email, password } = req.body;
 
   if (!name || !email || !password) {
@@ -47,12 +55,16 @@ export const register = async (req, res) => {
     res.status(201).json(userWithoutPassword);
 
   } catch (error) {
-    res.status(500).json({ message: 'Gagal membuat pengguna', error: error.message });
+    next(error);
   }
 };
 
-// POST /api/auth/login
-export const login = async (req, res) => {
+/**
+ * @route POST /api/auth/login
+ * @desc Authenticate a user and return a token
+ * @access Public
+ */
+export const login = async (req, res, next) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
@@ -77,12 +89,16 @@ export const login = async (req, res) => {
     res.json({ user: userWithoutPassword, token });
 
   } catch (error) {
-    res.status(500).json({ message: 'Gagal login', error: error.message });
+    next(error);
   }
 };
 
-// POST /api/auth/forgot-password
-export const forgotPassword = async (req, res) => {
+/**
+ * @route POST /api/auth/forgot-password
+ * @desc Request a password reset token
+ * @access Public
+ */
+export const forgotPassword = async (req, res, next) => {
   const { email } = req.body;
   try {
     const user = await db.user.findUnique({ where: { email } });
@@ -116,13 +132,16 @@ export const forgotPassword = async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Forgot Password Error:", error);
-    res.status(500).json({ message: 'Terjadi kesalahan internal.' });
+    next(error);
   }
 };
 
-// PUT /api/auth/reset-password/:token
-export const resetPassword = async (req, res) => {
+/**
+ * @route PUT /api/auth/reset-password/:token
+ * @desc Reset a user's password using a token
+ * @access Public
+ */
+export const resetPassword = async (req, res, next) => {
   const { token } = req.params;
   const { password } = req.body;
 
@@ -160,7 +179,6 @@ export const resetPassword = async (req, res) => {
     res.status(200).json({ message: 'Password berhasil direset. Silakan login.' });
 
   } catch (error) {
-    console.error("Reset Password Error:", error);
-    res.status(500).json({ message: 'Gagal mereset password.' });
+    next(error);
   }
 };

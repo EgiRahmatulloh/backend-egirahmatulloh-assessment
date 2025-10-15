@@ -7,8 +7,14 @@ import {
   getOrCreateCategory,
 } from '../utils/productUtils.js';
 import { emitInventoryBulkUpdate, emitInventoryUpdate } from '../realtime/inventoryGateway.js';
+import logger from '../config/logger.js';
 
-export const getAllProducts = async (req, res) => {
+/**
+ * @route GET /api/products
+ * @desc Get all products for the storefront
+ * @access Public
+ */
+export const getAllProducts = async (req, res, next) => {
   try {
     const productsFromDb = await db.product.findMany({
       where: { deletedAt: null },
@@ -28,12 +34,16 @@ export const getAllProducts = async (req, res) => {
 
     res.json(formatted);
   } catch (error) {
-    console.error('Error fetching products:', error);
-    res.status(500).json({ error: 'Gagal mengambil data produk.' });
+    next(error);
   }
 };
 
-export const searchProducts = async (req, res) => {
+/**
+ * @route GET /api/products/search
+ * @desc Search for products
+ * @access Public
+ */
+export const searchProducts = async (req, res, next) => {
   try {
     const { query } = req.query;
     if (!query) {
@@ -64,12 +74,16 @@ export const searchProducts = async (req, res) => {
 
     res.json(formatted);
   } catch (error) {
-    console.error('Error searching products:', error);
-    res.status(500).json({ error: 'Gagal mencari produk.' });
+    next(error);
   }
 };
 
-export const getAdminProducts = async (req, res) => {
+/**
+ * @route GET /api/products/admin
+ * @desc Get all products for the admin panel
+ * @access Private, Admin
+ */
+export const getAdminProducts = async (req, res, next) => {
     try {
       const products = await db.product.findMany({
         where: { deletedAt: null },
@@ -85,13 +99,16 @@ export const getAdminProducts = async (req, res) => {
 
       res.json(products.map(formatProductForAdmin));
     } catch (error) {
-      res
-        .status(500)
-        .json({ message: 'Gagal mengambil data produk admin', error: error.message });
+      next(error);
     }
   };
 
-export const createProduct = async (req, res) => {
+/**
+ * @route POST /api/products
+ * @desc Create a new product
+ * @access Private, Admin
+ */
+export const createProduct = async (req, res, next) => {
     const { name, description, categoryName, price, stock, brand } = req.body;
     let imageUrl = null;
 
@@ -152,12 +169,16 @@ export const createProduct = async (req, res) => {
 
       res.status(201).json(formatProductForAdmin(product));
     } catch (error) {
-      console.error('Error creating product:', error);
-      res.status(500).json({ message: 'Gagal membuat produk', error: error.message });
+      next(error);
     }
   };
 
-export const updateProduct = async (req, res) => {
+/**
+ * @route PUT /api/products/:id
+ * @desc Update a product
+ * @access Private, Admin
+ */
+export const updateProduct = async (req, res, next) => {
     const { id } = req.params;
     const { name, description, categoryName, price, stock, brand, image } = req.body;
     let imageUrl = image; // Keep existing image if no new one is uploaded
@@ -253,12 +274,16 @@ export const updateProduct = async (req, res) => {
 
       res.json(formatProductForAdmin(updatedProduct));
     } catch (error) {
-      console.error('Error updating product:', error);
-      res.status(500).json({ message: 'Gagal memperbarui produk', error: error.message });
+      next(error);
     }
   };
 
-export const getInventorySnapshot = async (req, res) => {
+/**
+ * @route GET /api/products/inventory
+ * @desc Get a snapshot of the current inventory
+ * @access Private, Admin
+ */
+export const getInventorySnapshot = async (req, res, next) => {
     try {
       const variants = await db.productVariant.findMany({
         where: {
@@ -278,12 +303,16 @@ export const getInventorySnapshot = async (req, res) => {
 
       res.json(payload);
     } catch (error) {
-      console.error('Error fetching inventory snapshot:', error);
-      res.status(500).json({ message: 'Gagal mengambil data stok.', error: error.message });
+      next(error);
     }
   };
 
-export const deleteProduct = async (req, res) => {
+/**
+ * @route DELETE /api/products/:id
+ * @desc Delete a product
+ * @access Private, Admin
+ */
+export const deleteProduct = async (req, res, next) => {
     const { id } = req.params;
 
     try {
@@ -319,7 +348,6 @@ export const deleteProduct = async (req, res) => {
 
       res.status(204).send();
     } catch (error) {
-      console.error('Error deleting product:', error);
-      res.status(500).json({ message: 'Gagal menghapus produk', error: error.message });
+      next(error);
     }
   };
