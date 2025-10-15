@@ -1,12 +1,18 @@
 import { markPaymentFailed, markPaymentSucceeded } from '../services/paymentService.js';
 import { getStripeClient } from '../utils/stripe.js';
+import logger from '../config/logger.js';
 
-export const stripeWebhookHandler = async (req, res) => {
+/**
+ * @route POST /api/payments/webhook
+ * @desc Handle Stripe webhooks
+ * @access Public
+ */
+export const stripeWebhookHandler = async (req, res, next) => {
   const signature = req.headers['stripe-signature'];
   const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
   if (!webhookSecret) {
-    console.error('Stripe webhook secret is not configured.');
+    logger.error('Stripe webhook secret is not configured.');
     return res.status(500).send('Stripe webhook secret is not configured.');
   }
 
@@ -23,9 +29,11 @@ export const stripeWebhookHandler = async (req, res) => {
       webhookSecret,
     );
   } catch (error) {
-    console.error('Stripe webhook signature verification failed:', error.message);
+    logger.error('Stripe webhook signature verification failed:', error.message);
     return res.status(400).send(`Webhook Error: ${error.message}`);
   }
+
+  logger.info(`Received Stripe webhook event: ${event.id}, type: ${event.type}`);
 
   try {
     switch (event.type) {
@@ -42,11 +50,12 @@ export const stripeWebhookHandler = async (req, res) => {
         await markPaymentFailed(event.data.object.id, 'Payment intent canceled.');
         break;
       default:
+        logger.info(`Unhandled Stripe webhook event type: ${event.type}`);
         break;
     }
   } catch (error) {
-    console.error('Stripe webhook processing error:', error);
-    return res.status(500).send('Webhook handler failed.');
+    logger.error('Stripe webhook processing error:', error);
+    return next(error);
   }
 
   res.json({ received: true });

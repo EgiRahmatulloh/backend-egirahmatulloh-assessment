@@ -1,7 +1,11 @@
 import { db } from '../config/db.js';
 
-// GET /api/cart - Mendapatkan isi keranjang pengguna
-export const getCart = async (req, res) => {
+/**
+ * @route GET /api/cart
+ * @desc Get the user's cart
+ * @access Private
+ */
+export const getCart = async (req, res, next) => {
   try {
     const cartItems = await db.cartItem.findMany({
       where: { cartId: req.cart.id },
@@ -29,12 +33,16 @@ export const getCart = async (req, res) => {
 
     res.json(formattedCart);
   } catch (error) {
-    res.status(500).json({ message: "Gagal mengambil isi keranjang", error: error.message });
+    next(error);
   }
 };
 
-// POST /api/cart/items - Menambahkan item ke keranjang
-export const addCartItem = async (req, res) => {
+/**
+ * @route POST /api/cart/items
+ * @desc Add an item to the cart
+ * @access Private
+ */
+export const addCartItem = async (req, res, next) => {
   const { productId, quantity } = req.body;
   if (!productId || quantity == null) {
     return res.status(400).json({ message: "ProductId dan quantity diperlukan" });
@@ -93,12 +101,16 @@ export const addCartItem = async (req, res) => {
 
     res.status(200).json(formattedCart);
   } catch (error) {
-    res.status(500).json({ message: "Gagal menambahkan item ke keranjang", error: error.message });
+    next(error);
   }
 };
 
-// PUT /api/cart/items/:itemId - Mengubah kuantitas item
-export const updateCartItem = async (req, res) => {
+/**
+ * @route PUT /api/cart/items/:itemId
+ * @desc Update the quantity of a cart item
+ * @access Private
+ */
+export const updateCartItem = async (req, res, next) => {
   const { itemId } = req.params;
   const { quantity } = req.body;
 
@@ -133,12 +145,16 @@ export const updateCartItem = async (req, res) => {
     res.status(200).json(formattedCart);
 
   } catch (error) {
-     res.status(500).json({ message: "Gagal mengubah kuantitas item", error: error.message });
+    next(error);
   }
 };
 
-// DELETE /api/cart/items/:itemId - Menghapus item dari keranjang
-export const deleteCartItem = async (req, res) => {
+/**
+ * @route DELETE /api/cart/items/:itemId
+ * @desc Delete an item from the cart
+ * @access Private
+ */
+export const deleteCartItem = async (req, res, next) => {
   const { itemId } = req.params;
 
   try {
@@ -167,6 +183,6 @@ export const deleteCartItem = async (req, res) => {
     res.status(200).json(formattedCart);
 
   } catch (error) {
-    res.status(500).json({ message: "Gagal menghapus item dari keranjang", error: error.message });
+    next(error);
   }
 };

@@ -6,7 +6,10 @@ import allRoutes from './routes/index.js';
 import { stripeWebhookHandler } from './controllers/paymentController.js';
 import { initInventoryGateway } from './realtime/inventoryGateway.js';
 
+import helmet from 'helmet';
+
 const app = express();
+app.use(helmet());
 const port = process.env.PORT || 3000;
 const server = createServer(app);
 
@@ -18,9 +21,15 @@ app.post(
 );
 app.use(express.json());
 
-app.use('/api', allRoutes);
+import apiLimiter from './middleware/rateLimiter.js';
+
+app.use('/api', apiLimiter, allRoutes);
 
 initInventoryGateway(server);
+
+import errorHandler from './middleware/errorHandler.js';
+
+app.use(errorHandler);
 
 server.listen(port, () => {
   console.log(`Server berjalan di http://localhost:${port}`);

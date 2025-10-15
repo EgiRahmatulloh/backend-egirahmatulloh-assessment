@@ -1,9 +1,14 @@
 import bcrypt from 'bcryptjs';
 import { db } from '../config/db.js';
 import cloudinary from '../config/cloudinary.js';
+import logger from '../config/logger.js';
 
-// PUT /api/users/me - Update user profile
-export const updateUserProfile = async (req, res) => {
+/**
+ * @route PUT /api/users/me
+ * @desc Update user profile
+ * @access Private
+ */
+export const updateUserProfile = async (req, res, next) => {
   const { name, password } = req.body;
   const updateData = {};
 
@@ -29,8 +34,8 @@ export const updateUserProfile = async (req, res) => {
       });
       updateData.avatar = cloudinaryResponse.secure_url;
     } catch (uploadError) {
-      console.error('Cloudinary upload error:', uploadError);
-      return res.status(500).json({ message: "Gagal mengunggah avatar" });
+      logger.error('Cloudinary upload error:', uploadError);
+      return next(uploadError);
     }
   }
 
@@ -47,6 +52,6 @@ export const updateUserProfile = async (req, res) => {
     const { password: _, ...userWithoutPassword } = updatedUser;
     res.json(userWithoutPassword);
   } catch (error) {
-    res.status(500).json({ message: "Gagal mengupdate profil", error: error.message });
+    next(error);
   }
 };

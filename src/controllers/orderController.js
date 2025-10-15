@@ -13,8 +13,12 @@ const ORDER_STATUS_DESCRIPTIONS = {
 
 const TRACKABLE_STATUSES = Object.keys(ORDER_STATUS_DESCRIPTIONS);
 
-// GET /api/orders - Get user's order history
-export const getOrderHistory = async (req, res) => {
+/**
+ * @route GET /api/orders
+ * @desc Get user's order history
+ * @access Private
+ */
+export const getOrderHistory = async (req, res, next) => {
   try {
     const orders = await db.order.findMany({
       where: { buyerId: req.userId },
@@ -34,12 +38,16 @@ export const getOrderHistory = async (req, res) => {
     });
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: "Gagal mengambil riwayat pesanan", error: error.message });
+    next(error);
   }
 };
 
-// GET /api/orders/all - Get all orders (admin)
-export const getAllOrders = async (req, res) => {
+/**
+ * @route GET /api/orders/all
+ * @desc Get all orders (admin)
+ * @access Private, Admin
+ */
+export const getAllOrders = async (req, res, next) => {
   try {
     const orders = await db.order.findMany({
       include: {
@@ -59,12 +67,16 @@ export const getAllOrders = async (req, res) => {
     });
     res.json(orders);
   } catch (error) {
-    res.status(500).json({ message: "Gagal mengambil semua pesanan", error: error.message });
+    next(error);
   }
 };
 
-// GET /api/orders/:orderId - Get a single order by ID
-export const getOrderById = async (req, res) => {
+/**
+ * @route GET /api/orders/:orderId
+ * @desc Get a single order by ID
+ * @access Private
+ */
+export const getOrderById = async (req, res, next) => {
   const { orderId } = req.params;
   try {
     const order = await db.order.findUnique({
@@ -92,13 +104,16 @@ export const getOrderById = async (req, res) => {
 
     res.json(order);
   } catch (error) {
-    res.status(500).json({ message: "Gagal mengambil detail pesanan", error: error.message });
+    next(error);
   }
 };
 
-
-// POST /api/orders - Create a new order
-export const createOrder = async (req, res) => {
+/**
+ * @route POST /api/orders
+ * @desc Create a new order
+ * @access Private
+ */
+export const createOrder = async (req, res, next) => {
     const { selectedAddressId, selectedDeliveryId } = req.body;
 
     if (!selectedAddressId || !selectedDeliveryId) {
@@ -186,7 +201,6 @@ export const createOrder = async (req, res) => {
         try {
             paymentIntent = await createPaymentIntentForOrder(newOrder.id, totalPrice);
         } catch (paymentError) {
-            console.error("Payment intent creation failed:", paymentError);
             await db.payment.update({
                 where: { orderId: newOrder.id },
                 data: {
@@ -194,10 +208,7 @@ export const createOrder = async (req, res) => {
                     paymentType: 'ONLINE',
                 },
             });
-            return res.status(500).json({
-                message: "Gagal memproses pembayaran",
-                error: paymentError.message,
-            });
+            return next(paymentError);
         }
 
         const orderWithPayment = await db.order.findUnique({
@@ -227,12 +238,16 @@ export const createOrder = async (req, res) => {
         }
 
     } catch (error) {
-        console.error("Order creation failed:", error);
-        res.status(500).json({ message: "Gagal membuat pesanan", error: error.message });
+        next(error);
     }
 };
 
-export const requestPaymentIntent = async (req, res) => {
+/**
+ * @route POST /api/orders/:orderId/payment-intent
+ * @desc Request a new payment intent for an existing order
+ * @access Private
+ */
+export const requestPaymentIntent = async (req, res, next) => {
   const { orderId } = req.params;
 
   try {
@@ -274,13 +289,16 @@ export const requestPaymentIntent = async (req, res) => {
       stripePublishableKey: process.env.STRIPE_API_KEY || null,
     });
   } catch (error) {
-    console.error('Failed to generate payment intent:', error);
-    res.status(500).json({ message: 'Gagal memproses pembayaran', error: error.message });
+    next(error);
   }
 };
 
-// PUT /api/orders/:orderId/status - Update order status (admin)
-export const updateOrderStatus = async (req, res) => {
+/**
+ * @route PUT /api/orders/:orderId/status
+ * @desc Update order status (admin)
+ * @access Private, Admin
+ */
+export const updateOrderStatus = async (req, res, next) => {
   const { orderId } = req.params;
   const { status, description, trackingNumber } = req.body;
 
@@ -341,6 +359,6 @@ export const updateOrderStatus = async (req, res) => {
     if (error.message === 'Pesanan tidak ditemukan') {
       return res.status(404).json({ message: error.message });
     }
-    res.status(500).json({ message: "Gagal memperbarui status pesanan", error: error.message });
+    next(error);
   }
 };
