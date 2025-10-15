@@ -1,6 +1,8 @@
 import { PaymentStatus } from '@prisma/client';
 import { db } from '../config/db.js';
 import { getStripeClient } from '../utils/stripe.js';
+import { emitInventoryUpdate } from '../realtime/inventoryGateway.js';
+import { buildInventoryUpdateFromVariant } from '../utils/productUtils.js';
 
 const DEFAULT_CURRENCY = (process.env.STRIPE_CURRENCY || 'idr').toLowerCase();
 const ZERO_DECIMAL_CURRENCIES = new Set([
@@ -47,7 +49,7 @@ export const createPaymentIntentForOrder = async (orderId, totalAmount) => {
 
   const stripe = getStripeClient();
   const amountInMinorUnit = ZERO_DECIMAL_CURRENCIES.has(DEFAULT_CURRENCY)
-    ? Math.round(numericAmount)
+    ? Math.round(numericAmount * 100) // Mengalikan dengan 100 untuk mata uang zero-decimal seperti IDR agar sesuai dengan ekspektasi Stripe
     : Math.round(numericAmount * 100);
 
   const paymentIntent = await stripe.paymentIntents.create({
@@ -124,6 +126,17 @@ export const markPaymentSucceeded = async (paymentIntentId) => {
         where: { id: item.variantId },
         data: { stock: updatedStock },
       });
+
+      const inventoryUpdate = buildInventoryUpdateFromVariant(
+        {
+          ...item.variant,
+          stock: updatedStock,
+          updatedAt: new Date(),
+        },
+      );
+      if (inventoryUpdate) {
+        emitInventoryUpdate(inventoryUpdate);
+      }
     }
   });
 };

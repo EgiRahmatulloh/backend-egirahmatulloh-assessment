@@ -5,6 +5,7 @@ import {
   getAllProducts,
   searchProducts,
   getAdminProducts,
+  getInventorySnapshot,
   createProduct,
   updateProduct,
   deleteProduct,
@@ -15,6 +16,7 @@ const upload = multer({ storage: multer.memoryStorage() });
 
 router.get('/', getAllProducts);
 router.get('/search', searchProducts);
+router.get('/inventory/snapshot', getInventorySnapshot);
 router.get('/admin', authenticateToken, requireAdmin, getAdminProducts);
 router.post('/', authenticateToken, requireAdmin, upload.single('image'), createProduct);
 router.put('/:id', authenticateToken, requireAdmin, upload.single('image'), updateProduct);

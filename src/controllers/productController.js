@@ -3,8 +3,10 @@ import cloudinary from '../config/cloudinary.js';
 import {
   formatProductForStorefront,
   formatProductForAdmin,
+  buildInventoryUpdateFromVariant,
   getOrCreateCategory,
 } from '../utils/productUtils.js';
+import { emitInventoryBulkUpdate, emitInventoryUpdate } from '../realtime/inventoryGateway.js';
 
 export const getAllProducts = async (req, res) => {
   try {
@@ -143,6 +145,11 @@ export const createProduct = async (req, res) => {
         },
       });
 
+      const inventoryUpdate = buildInventoryUpdateFromVariant(product.variants[0]);
+      if (inventoryUpdate) {
+        emitInventoryUpdate(inventoryUpdate);
+      }
+
       res.status(201).json(formatProductForAdmin(product));
     } catch (error) {
       console.error('Error creating product:', error);
@@ -238,10 +245,41 @@ export const updateProduct = async (req, res) => {
         });
       });
 
+      const updatedVariant = updatedProduct?.variants?.[0];
+      const inventoryUpdate = buildInventoryUpdateFromVariant(updatedVariant);
+      if (inventoryUpdate) {
+        emitInventoryUpdate(inventoryUpdate);
+      }
+
       res.json(formatProductForAdmin(updatedProduct));
     } catch (error) {
       console.error('Error updating product:', error);
       res.status(500).json({ message: 'Gagal memperbarui produk', error: error.message });
+    }
+  };
+
+export const getInventorySnapshot = async (req, res) => {
+    try {
+      const variants = await db.productVariant.findMany({
+        where: {
+          product: { deletedAt: null },
+        },
+        select: {
+          id: true,
+          productId: true,
+          stock: true,
+          updatedAt: true,
+        },
+      });
+
+      const payload = variants
+        .map((variant) => buildInventoryUpdateFromVariant(variant))
+        .filter(Boolean);
+
+      res.json(payload);
+    } catch (error) {
+      console.error('Error fetching inventory snapshot:', error);
+      res.status(500).json({ message: 'Gagal mengambil data stok.', error: error.message });
     }
   };
 
@@ -251,17 +289,33 @@ export const deleteProduct = async (req, res) => {
     try {
       const existingProduct = await db.product.findUnique({
         where: { id },
-        select: { id: true, deletedAt: true },
+        include: { variants: true },
       });
 
       if (!existingProduct || existingProduct.deletedAt) {
         return res.status(404).json({ message: 'Produk tidak ditemukan' });
       }
 
+      const deletedAt = new Date();
+
       await db.product.update({
         where: { id },
-        data: { deletedAt: new Date() },
+        data: { deletedAt },
       });
+
+      const inventoryUpdates = (existingProduct.variants || [])
+        .map((variant) =>
+          buildInventoryUpdateFromVariant(variant, {
+            stock: 0,
+            deleted: true,
+            updatedAt: deletedAt.toISOString(),
+          }),
+        )
+        .filter(Boolean);
+
+      if (inventoryUpdates.length) {
+        emitInventoryBulkUpdate(inventoryUpdates);
+      }
 
       res.status(204).send();
     } catch (error) {
