@@ -69,6 +69,22 @@ export const formatProductForAdmin = (product) => {
   };
 };
 
+export const buildInventoryUpdateFromVariant = (variant, overrides = {}) => {
+  if (!variant) {
+    return null;
+  }
+
+  return {
+    productId: variant.productId,
+    variantId: variant.id,
+    stock: variant.stock,
+    updatedAt: variant.updatedAt
+      ? new Date(variant.updatedAt).toISOString()
+      : new Date().toISOString(),
+    ...overrides,
+  };
+};
+
 export const slugify = (value) => {
   return value
     .toString()
