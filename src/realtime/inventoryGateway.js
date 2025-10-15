@@ -54,7 +54,6 @@ const ensureNamespaces = httpServer => {
       credentials: true,
     },
     transports: ['websocket', 'polling'],
-    path: '/socket.io',
   });
 
   inventoryNamespace = ioInstance.of('/inventory');
