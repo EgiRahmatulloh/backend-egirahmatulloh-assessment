@@ -16,23 +16,37 @@ import logger from '../config/logger.js';
  */
 export const getAllProducts = async (req, res, next) => {
   try {
-    const productsFromDb = await db.product.findMany({
-      where: { deletedAt: null },
-      include: {
-        variants: {
-          include: { reviews: true },
-          orderBy: { createdAt: 'asc' },
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const [productsFromDb, totalProducts] = await db.$transaction([
+      db.product.findMany({
+        skip,
+        take: limit,
+        where: { deletedAt: null },
+        include: {
+          variants: {
+            include: { reviews: true },
+            orderBy: { createdAt: 'asc' },
+          },
+          category: true,
         },
-        category: true,
-      },
-      orderBy: { createdAt: 'desc' },
-    });
+        orderBy: { createdAt: 'desc' },
+      }),
+      db.product.count({ where: { deletedAt: null } }),
+    ]);
 
     const formatted = productsFromDb
       .map(formatProductForStorefront)
       .filter(Boolean);
 
-    res.json(formatted);
+    res.json({
+      products: formatted,
+      totalProducts,
+      totalPages: Math.ceil(totalProducts / limit),
+      currentPage: page,
+    });
   } catch (error) {
     next(error);
   }
