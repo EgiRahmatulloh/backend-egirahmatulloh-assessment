@@ -1,6 +1,6 @@
 {
-  "name": "backend-sosial-media-layanan-web",
-  "description": "Backend API untuk aplikasi sosial media",
+  "name": "backend-egirahmatulloh-assessment",
+  "description": "Backend for the Test-UPT-TIK project",
   "main": "server.js",
   "type": "module",
   "scripts": {
