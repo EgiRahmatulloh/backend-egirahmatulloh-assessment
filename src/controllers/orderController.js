@@ -49,23 +49,46 @@ export const getOrderHistory = async (req, res, next) => {
  */
 export const getAllOrders = async (req, res, next) => {
   try {
-    const orders = await db.order.findMany({
-      include: {
-        orderItems: true,
-        shippingInfo: true,
-        payment: true,
-        user: true,
-        trackingUpdates: {
-          orderBy: {
-            createdAt: 'asc',
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
+
+    const [orders, totalOrders] = await db.$transaction([
+      db.order.findMany({
+        skip,
+        take: limit,
+        include: {
+          orderItems: {
+            include: {
+              variant: {
+                include: {
+                  product: true,
+                },
+              },
+            },
+          },
+          shippingInfo: true,
+          payment: true,
+          user: true,
+          trackingUpdates: {
+            orderBy: {
+              createdAt: 'asc',
+            },
           },
         },
-      },
-      orderBy: {
-        createdAt: 'desc',
-      },
+        orderBy: {
+          createdAt: 'desc',
+        },
+      }),
+      db.order.count(),
+    ]);
+
+    res.json({ 
+      orders,
+      totalOrders,
+      totalPages: Math.ceil(totalOrders / limit),
+      currentPage: page,
     });
-    res.json(orders);
   } catch (error) {
     next(error);
   }
