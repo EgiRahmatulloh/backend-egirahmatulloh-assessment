@@ -1,25 +1,31 @@
 # Backend Service
 
-This is the backend service for the e-commerce application. It is built with Node.js, Express, and Prisma.
+Ini adalah layanan backend untuk aplikasi e-commerce. Dibangun dengan Node.js, Express, and Prisma.
 
-## Features
+## Fitur
 
-*   User authentication and authorization (JWT)
-*   Product and order management
-*   Shopping cart functionality
-*   Payment integration with Stripe
-*   Real-time inventory updates with Socket.IO
-*   Image uploads to Cloudinary
+*   Autentikasi dan otorisasi user (JWT)
+*   Manajemen produk dan order
+*   Fungsionalitas shopping cart
+*   Integrasi pembayaran dengan Stripe
+*   Update inventaris real-time dengan Socket.IO
+*   Upload gambar ke Cloudinary
 
-## Prerequisites
+## Arsitektur
 
-*   Node.js (v18 or higher)
-*   npm
-*   A running PostgreSQL database
+Backend ini mengikuti struktur proyek Node.js standar, dengan pemisahan concerns yang jelas.
 
-## Getting Started
+*   **Framework:** [Express.js](https://expressjs.com/) digunakan sebagai web framework karena kesederhanaan dan fleksibilitasnya.
+*   **Database:** [PostgreSQL](https://www.postgresql.org/) digunakan sebagai database karena ketahanan dan keandalannya.
+*   **ORM:** [Prisma](https://www.prisma.io/) digunakan sebagai Object-Relational Mapper (ORM) untuk berinteraksi dengan database. Ini menyediakan API yang type-safe dan intuitif untuk operasi database.
+*   **Autentikasi:** Autentikasi ditangani menggunakan JSON Web Tokens (JWT). Ketika seorang user login, JWT dibuat dan dikirim ke client. Client kemudian menyertakan token ini di header `Authorization` dari request berikutnya untuk mengakses route yang dilindungi.
+*   **Komunikasi Real-time:** [Socket.IO](https://socket.io/) digunakan untuk komunikasi real-time antara server dan client. Ini digunakan untuk mendorong update inventaris ke client secara real-time.
+*   **Penyimpanan Gambar:** [Cloudinary](https://cloudinary.com/) digunakan untuk menyimpan dan menyajikan gambar produk dan avatar user.
+*   **Pembayaran:** [Stripe](https://stripe.com/) digunakan untuk memproses pembayaran.
 
-### 1. Clone the repository
+## Memulai
+
+### 1. Clone repository
 
 ```bash
 git clone https://github.com/username/repo.git
@@ -32,39 +38,39 @@ cd backend-egirahmatulloh-assessment
 npm install
 ```
 
-### 3. Set up environment variables
+### 3. Siapkan environment variables
 
-Create a `.env` file in the root of the project and add the following variables. You can copy the `.env.example` file.
+Buat file `.env` di root proyek dan tambahkan variabel berikut. Anda dapat menyalin file `.env.example`.
 
 ```bash
 cp .env.example .env
 ```
 
-See the `.env.example` file for a list of all required environment variables.
+Lihat file `.env.example` untuk daftar semua environment variables yang diperlukan.
 
-### 4. Apply database migrations
+### 4. Terapkan migrasi database
 
 ```bash
 npx prisma migrate dev
 ```
 
-### 5. Seed the database (optional)
+### 5. Seed database (opsional)
 
 ```bash
 npm run prisma:seed
 ```
 
-### 6. Run the application
+### 6. Jalankan aplikasi
 
-For development:
+Untuk development:
 
 ```bash
 npm run dev
 ```
 
-The server will start on `http://localhost:3000` (or the port specified in your `.env` file).
+Server akan dimulai di `http://localhost:3000` (atau port yang ditentukan di file `.env` Anda).
 
-For production:
+Untuk production:
 
 ```bash
 npm start
@@ -72,24 +78,76 @@ npm start
 
 ## API Endpoints
 
-The API endpoints are defined in the `src/routes` directory.
+### Autentikasi (`/api/auth`)
 
-## Project Structure
+| Method | Endpoint                    | Access  | Deskripsi                               |
+| :----- | :-------------------------- | :------ | :---------------------------------------- |
+| `GET`    | `/me`                       | Private | Dapatkan user yang sedang login          |
+| `POST`   | `/register`                 | Public  | Daftarkan user baru                       |
+| `POST`   | `/login`                    | Public  | Otentikasi user dan kembalikan token    |
+| `POST`   | `/forgot-password`          | Public  | Minta token reset password            |
+| `PUT`    | `/reset-password/:token`    | Public  | Reset password user menggunakan token   |
+
+### Cart (`/api/cart`)
+
+| Method | Endpoint          | Access  | Deskripsi                      |
+| :----- | :---------------- | :------ | :------------------------------- |
+| `GET`    | `/`               | Private | Dapatkan cart user              |
+| `POST`   | `/items`          | Private | Tambahkan item ke cart          |
+| `PUT`    | `/items/:itemId`  | Private | Update kuantitas item cart |
+| `DELETE` | `/items/:itemId`  | Private | Hapus item dari cart     |
+
+### Orders (`/api/orders`)
+
+| Method | Endpoint                             | Access        | Deskripsi                                      |
+| :----- | :----------------------------------- | :------------ | :----------------------------------------------- |
+| `GET`    | `/`                                  | Private       | Dapatkan riwayat order user                         |
+| `GET`    | `/all`                               | Private, Admin| Dapatkan semua order (admin)                           |
+| `GET`    | `/:orderId`                          | Private       | Dapatkan satu order berdasarkan ID                         |
+| `POST`   | `/`                                  | Private       | Buat order baru                               |
+| `POST`   | `/:orderId/payment-intent`           | Private       | Minta payment intent baru untuk order yang ada |
+| `PUT`    | `/:orderId/status`                   | Private, Admin| Update status order (admin)                      |
+
+### Payments (`/api/payments`)
+
+| Method | Endpoint   | Access | Deskripsi              |
+| :----- | :--------- | :----- | :----------------------- |
+| `POST`   | `/webhook` | Public | Tangani webhook Stripe   |
+
+### Products (`/api/products`)
+
+| Method | Endpoint         | Access        | Deskripsi                               |
+| :----- | :--------------- | :------------ | :---------------------------------------- |
+| `GET`    | `/`              | Public        | Dapatkan semua produk untuk storefront       |
+| `GET`    | `/search`        | Public        | Cari produk                       |
+| `GET`    | `/admin`         | Private, Admin| Dapatkan semua produk untuk panel admin      |
+| `POST`   | `/`              | Private, Admin| Buat produk baru                      |
+| `PUT`    | `/:id`           | Private, Admin| Update produk                          |
+| `GET`    | `/inventory`     | Private, Admin| Dapatkan snapshot inventaris saat ini   |
+| `DELETE` | `/:id`           | Private, Admin| Hapus produk                          |
+
+### Users (`/api/users`)
+
+| Method | Endpoint | Access  | Deskripsi          |
+| :----- | :------- | :------ | :------------------- |
+| `PUT`    | `/me`    | Private | Update profil user  |
+
+## Struktur Proyek
 
 ```
 .
 ├── prisma/
-│   ├── schema.prisma   # Database schema
-│   └── seed.js         # Database seed script
+│   ├── schema.prisma   # Skema database
+│   └── seed.js         # Skrip seed database
 ├── src/
-│   ├── config/         # Configuration files
-│   ├── controllers/    # Route handlers
-│   ├── middleware/     # Express middleware
-│   ├── realtime/       # Socket.IO logic
-│   ├── routes/         # API routes
-│   ├── services/       # Business logic
-│   └── utils/          # Utility functions
-├── .env.example        # Example environment variables
+│   ├── config/         # File konfigurasi
+│   ├── controllers/    # Penangan route
+│   ├── middleware/     # Middleware Express
+│   ├── realtime/       # Logika Socket.IO
+│   ├── routes/         # Rute API
+│   ├── services/       # Logika bisnis
+│   └── utils/          # Fungsi utilitas
+├── .env.example        # Contoh environment variables
 ├── package.json
-└── server.js           # Server entry point
+└── server.js           # Titik masuk server
 ```
